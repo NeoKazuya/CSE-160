@@ -17,7 +17,7 @@ function main() {
   ctx.fillStyle = 'rgba(0, 0, 0, 1.0)'; // Set color to black
   ctx.fillRect(0, 0, canvas.width, canvas.height);        // Fill a rectangle with the color
   
-  let v1 = new Vector3([2.25, 2.25, 0]);  //ChatGPT used to understand Float32Array arguments
+  let v1 = new Vector3([0, 0, 0]);  //ChatGPT used to understand Float32Array arguments
   drawVector(v1, "red");
 
 
@@ -31,10 +31,6 @@ function main() {
 
 }
 function drawVector(v, color) {
-  //var canvas = document.getElementById('example');
-  //var ctx = canvas.getContext('2d');
-  //now global
-  
   ctx.strokeStyle = color;  //set color
 
   let centerX = canvas.width / 2;
