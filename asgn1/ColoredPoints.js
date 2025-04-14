@@ -1,5 +1,6 @@
 // ColoredPoint.js (c) 2012 matsuda
 // Vertex shader program
+
 var VSHADER_SOURCE =
   'attribute vec4 a_Position;\n' +
   'uniform float u_Size;\n' +
@@ -66,25 +67,36 @@ function connectVariablestoGLSL(){
   }
 }
 
+const POINT = 0;
+const TRIANGLE = 1;
+const CIRCLE = 2;
+
+
 //globals for UI elements
 let g_selectedColor=[1.0,1.0,1.0,1.0];
 let g_selectedSize=10;
+let g_segmentSize=10;
+let g_selectedType=POINT
 
 function addActionsForHtmlUI(){
   //buttons
   document.getElementById('red').onclick = function() {g_selectedColor = [1.0,0.0,0.0,1.0];};
   document.getElementById('green').onclick = function() {g_selectedColor = [0.0,1.0,0.0,1.0];};
   document.getElementById('blue').onclick = function() {g_selectedColor = [0.0,0.0,1.0,1.0];};
- 
+   //clear
   document.getElementById('clear').onclick = function() {g_shapesList=[]; renderAllShapes();};
-
+  //pick between shapes
+  document.getElementById('pointButton').onclick = function() {g_selectedType=POINT};
+  document.getElementById('triButton').onclick = function() {g_selectedType=TRIANGLE};
+  document.getElementById('circleButton').onclick = function() {g_selectedType=CIRCLE};
   //color sliders
   document.getElementById('redSlide').addEventListener('mouseup', function() {g_selectedColor[0] = this.value/100});
   document.getElementById('greenSlide').addEventListener('mouseup', function() {g_selectedColor[1] = this.value/100});
   document.getElementById('blueSlide').addEventListener('mouseup', function() {g_selectedColor[2] = this.value/100});
   //size sliders
   document.getElementById('sizeSlide').addEventListener('mouseup', function() {g_selectedSize = this.value});
-
+  //segment count sliders
+  document.getElementById('segSlide').addEventListener('mouseup', function() {g_segmentSize = this.value});
   
 }
 
@@ -131,14 +143,20 @@ function click(ev) {
   //extract click and return in WebGL coord form
   let [x,y] = convertCoordinatesEventToGL(ev);
 
-  let point = new Point();
+  let point;
+  if (g_selectedType==POINT) {
+    point = new Point();
+  } else if (g_selectedType==TRIANGLE) {
+    point = new Triangle();
+  } else {
+    point = new Circle();
+    point.segments = g_segmentSize;   //chatGPT helped figure out this should go here
+  }
+  
   point.position=[x,y];
   point.color=g_selectedColor.slice();
   point.size=g_selectedSize;
   g_shapesList.push(point);
-  
-  //g_points.push([x,y]);
-
 
   renderAllShapes();
   
@@ -155,11 +173,12 @@ function renderAllShapes() {
     g_shapesList[i].render();
     
   }
-
-  var duration = performance.now() - startTime;
-  //debug time
-  sendTextToHTML("numdot: " + len + " ms: " + Math.floor(duration) + " fps: " + Math.floor(1000/duration)/10, "numdot");
-  }
+// //debug time
+//   var duration = performance.now() - startTime;
+  
+//   sendTextToHTML("numdot: " + len + " ms: " + Math.floor(duration) + " fps: " + Math.floor(1000/duration)/10, "numdot");
+//  
+}
 
 function sendTextToHTML(text, htmlID) {
   var htmlElm = document.getElementById(htmlID);
