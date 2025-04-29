@@ -8,9 +8,9 @@ class Cube{
       this.matrix = new Matrix4();
     }
     
-    render() {
-      var rgba = this.color;
-      gl.uniform4f(u_FragColor, rgba[0]*.9, rgba[1]*.9, rgba[2]*.9, rgba[3]);
+    render(color) {
+      var rgba = color || this.color;
+      gl.uniform4f(u_FragColor, rgba[0], rgba[1], rgba[2], rgba[3]);
       gl.uniformMatrix4fv(u_ModelMatrix, false, this.matrix.elements);
 
       //v0: (0,0,0), v1: (1,0,0), v2: (1,1,0), v3: (0,1,0)

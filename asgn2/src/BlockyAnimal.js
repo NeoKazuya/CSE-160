@@ -88,60 +88,62 @@ function connectVariablestoGLSL(){
   gl.uniformMatrix4fv(u_ModelMatrix, false, identityM.elements);
 }
 
-const POINT = 0;
-const TRIANGLE = 1;
-const CIRCLE = 2;
-
 
 //globals for UI elements
-let g_selectedColor=[1.0,1.0,1.0,1.0];
-
-let g_segmentSize=10;
-let g_selectedType=POINT
 
 let g_globalAngle = 0;
+let g_globalAngleX = 0; // X rotation for up/down mouse drag
+let g_globalAngleY = 0; // Y rotation for left/right mouse drag
 
-let g_presetModeActive = false;
-let g_yellowAngle = 0;
-let g_magentaAngle = 0;
-let g_yellowAnimation = false; // Controls if yellow arm is animated
-let g_magentaAnimation = false;
+
+let g_leftArmAngle = -70;
+let g_leftHandAngle = 0;
+let g_rightArmAngle = -70;
+let g_rightHandAngle = -20;
+let g_leftArmAnimation = false; // Controls if left arm is animated
+let g_leftHandAnimation = false; // Controls if left hand is animated
+let g_walkingStickAnimation = true; // Controls if walking stick is animated
+let g_walkingStickAngle = 0; // Angle for walking stick
+let g_rightArmAnimation = false; // Controls if right arm is animated
+let g_rightHandAnimation = false; // Controls if right hand is animated
+
+// Cached DOM elements for sliders (optimization) (gpt helped with this)
+let walkingStickSlider, leftArmSlider, rightArmSlider, leftHandSlider, rightHandSlider, angleSlider;
 
 function addActionsForHtmlUI(){
-  //buttons
-  
-  
-  
-  
-   //clear
-  document.getElementById('clear').onclick = function() {g_shapesList=[]; renderAllShapes(); g_presetModeActive=false};
-  //pick between shapes
-  document.getElementById('pointButton').onclick = function() {g_selectedType=POINT; updateSegmentSliderVisibility();};
-  document.getElementById('triButton').onclick = function() {g_selectedType=TRIANGLE; updateSegmentSliderVisibility();};
-  document.getElementById('circleButton').onclick = function() {g_selectedType=CIRCLE; updateSegmentSliderVisibility();};
-  //activate presetDrawing
-  document.getElementById('presetButton').onclick = function() {g_presetModeActive = !g_presetModeActive; renderAllShapes();}
-  //color sliders
-  
-  
-  
+  // Cache slider elements globally
+  leftArmSlider = document.getElementById('leftArmSlide');
+  rightArmSlider = document.getElementById('rightArmSlide');
+  leftHandSlider = document.getElementById('leftHandSlide');
+  rightHandSlider = document.getElementById('rightHandSlide');
+  walkingStickSlider = document.getElementById('walkingStickSlide');
+  angleSlider = document.getElementById('angleSlide');
 
-  //segment count sliders
-  document.getElementById('segSlide').addEventListener('mouseup', function() {g_segmentSize = this.value});
-  document.getElementById('yellowSlide').addEventListener('mousemove', function() {g_yellowAngle = this.value; renderAllShapes();});
+  // Arm sliders
+  leftArmSlider.addEventListener('mousemove', function() {g_leftArmAngle = this.value; renderAllShapes();});
+  rightArmSlider.addEventListener('mousemove', function() {g_rightArmAngle = this.value; renderAllShapes();});
 
-  // Animation ON/OFF for yellow arm
-  document.getElementById('animationYellowOnButton').onclick = function() { g_yellowAnimation = true; };
-  document.getElementById('animationYellowOffButton').onclick = function() { g_yellowAnimation = false; };
-  document.getElementById('animationMagentaOnButton').onclick = function() { g_magentaAnimation = true; };
-document.getElementById('animationMagentaOffButton').onclick = function() { g_magentaAnimation = false; };
-  document.getElementById('magentaSlide').addEventListener('mousemove', function() {g_magentaAngle = this.value; renderAllShapes();});
+  // Animation ON/OFF for left arm
+  document.getElementById('animationLeftArmOnButton').onclick = function() { g_leftArmAnimation = true; };
+  document.getElementById('animationLeftArmOffButton').onclick = function() { g_leftArmAnimation = false; };
+  document.getElementById('animationLeftHandOnButton').onclick = function() { g_leftHandAnimation = true; };
+  document.getElementById('animationLeftHandOffButton').onclick = function() { g_leftHandAnimation = false; };
+  document.getElementById('leftHandSlide').addEventListener('mousemove', function() {g_leftHandAngle = this.value; renderAllShapes();});
+  // Animation ON/OFF for right arm
+  document.getElementById('animationRightArmOnButton').onclick = function() { g_rightArmAnimation = true; };
+  document.getElementById('animationRightArmOffButton').onclick = function() { g_rightArmAnimation = false; };
+  // Animation ON/OFF for right hand
+  document.getElementById('animationRightHandOnButton').onclick = function() { g_rightHandAnimation = true; };
+  document.getElementById('animationRightHandOffButton').onclick = function() { g_rightHandAnimation = false; };
+  document.getElementById('rightHandSlide').addEventListener('mousemove', function() {g_rightHandAngle = this.value; renderAllShapes();});
 
   document.getElementById('angleSlide').addEventListener('mousemove', function() {g_globalAngle = this.value; renderAllShapes();});
 
+  // Walking stick animation controls
+  document.getElementById('animationWalkingStickOnButton').onclick = function() { g_walkingStickAnimation = true; };
+  document.getElementById('animationWalkingStickOffButton').onclick = function() { g_walkingStickAnimation = false; };
+  document.getElementById('walkingStickSlide').addEventListener('mousemove', function() {g_walkingStickAngle = Number(this.value); renderAllShapes();});
 }
-
-
 
 function main() {
   
@@ -149,11 +151,46 @@ function main() {
   connectVariablestoGLSL();  //set up GLSL shader programs/variables
 
   addActionsForHtmlUI();  //HTML UI elements
-  
-  // Register function (event handler) to be called on a mouse press
-  canvas.onmousedown = click;
-  //canvas.onmousemove = click;
-  canvas.onmousemove = function (ev)  { if(ev.buttons == 1) {click(ev)}};
+
+  //gpt used to debug rotation/drag + make it smooth
+  // Mouse drag rotation variables
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+  let startAngleY = 0, startAngleX = 0;
+
+  // Mouse down: start drag
+  canvas.addEventListener('mousedown', function(ev) {
+    // Poke animation: shift+click, performance.now() for timing as suggested by gpt
+    if (ev.shiftKey) {
+      g_pokeActive = true;
+      g_pokeStartTime = performance.now();
+      renderAllShapes();
+      return;
+    }
+    isDragging = true;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
+    startAngleY = g_globalAngleY + g_globalAngle;
+    startAngleX = g_globalAngleX;
+  });
+  // Mouse up: stop drag
+  canvas.addEventListener('mouseup', function(ev) {
+    isDragging = false;
+  });
+  // Mouse leave: stop drag
+  canvas.addEventListener('mouseleave', function(ev) {
+    isDragging = false;
+  });
+  // Mouse move: update rotation if dragging
+  canvas.addEventListener('mousemove', function(ev) {
+    if (isDragging) {
+      const dx = ev.clientX - lastX;
+      const dy = ev.clientY - lastY;
+      g_globalAngleY = startAngleY + dx * 0.2 - g_globalAngle;
+      g_globalAngleX = startAngleX + dy * 0.2;
+      renderAllShapes();
+    }
+  });
 
   // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -167,11 +204,59 @@ var g_seconds = performance.now()/1000.0 - g_startTime;
 
 // Update the angles of everything if currently animated
 function updateAnimationAngles() {
-  if (g_yellowAnimation) {
-    g_yellowAngle = 45 * Math.sin(g_seconds);
+  // Handle poke animation timing
+  if (g_pokeActive && performance.now() - g_pokeStartTime > POKE_DURATION) {
+    g_pokeActive = false;
   }
-  if (g_magentaAnimation) {
-    g_magentaAngle = 45 * Math.sin(3 * g_seconds);
+  // Animate walking stick
+  if (g_pokeActive) {
+    // angery: swing rapidly
+    g_walkingStickAngle = 90 * Math.sin((performance.now() - g_pokeStartTime) / 80);
+    const walkingStickSlider = document.getElementById('walkingStickSlide');
+    walkingStickSlider.value = g_walkingStickAngle;
+  } else if (g_walkingStickAnimation) {
+    g_walkingStickAngle = 30 * Math.sin(g_seconds);
+    const walkingStickSlider = document.getElementById('walkingStickSlide');
+    walkingStickSlider.value = g_walkingStickAngle;
+  }
+
+  if (g_leftArmAnimation) {
+    //replaced with chatGPT help to get value from sliders for animation
+    // Old animation logic (hardcoded -45 to 45):
+    // g_yellowAngle = 45 * Math.sin(g_seconds);
+
+    // New animation logic: uses slider min/max for left arm
+    const leftArmSlider = document.getElementById('leftArmSlide');
+    const minLA = Number(leftArmSlider.min);
+    const maxLA = Number(leftArmSlider.max);
+    g_leftArmAngle = ((maxLA - minLA) / 2) * Math.sin(g_seconds) + (maxLA + minLA) / 2;
+    leftArmSlider.value = g_leftArmAngle;
+  }
+  if (g_leftHandAnimation) {
+    //replaced with chatGPT help to get value from sliders for animation
+    // Old animation logic (hardcoded -45 to 45):
+    // g_magentaAngle = 45 * Math.sin(3 * g_seconds);
+
+    // New animation logic: uses slider min/max for left hand
+    const leftHandSlider = document.getElementById('leftHandSlide');
+    const minLH = Number(leftHandSlider.min);
+    const maxLH = Number(leftHandSlider.max);
+    g_leftHandAngle = ((maxLH - minLH) / 2) * Math.sin(3 * g_seconds) + (maxLH + minLH) / 2;
+    leftHandSlider.value = g_leftHandAngle;
+  }
+  if (g_rightArmAnimation) {
+    const rightArmSlider = document.getElementById('rightArmSlide');
+    const minRA = Number(rightArmSlider.min);
+    const maxRA = Number(rightArmSlider.max);
+    g_rightArmAngle = ((maxRA - minRA) / 2) * Math.sin(g_seconds) + (maxRA + minRA) / 2;
+    rightArmSlider.value = g_rightArmAngle;
+  }
+   if (g_rightHandAnimation) {
+    const rightHandSlider = document.getElementById('rightHandSlide');
+    const minRH = Number(rightHandSlider.min);
+    const maxRH = Number(rightHandSlider.max);
+    g_rightHandAngle = ((maxRH - minRH) / 2) * Math.sin(3 * g_seconds) + (maxRH + minRH) / 2;
+    rightHandSlider.value = g_rightHandAngle;
   }
 }
 
@@ -187,97 +272,123 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-
-
-function convertCoordinatesEventToGL(ev) {
-  var x = ev.clientX; // x coordinate of a mouse pointer
-  var y = ev.clientY; // y coordinate of a mouse pointer
-  var rect = ev.target.getBoundingClientRect();
-
-  
-
-  x = ((x - rect.left) - canvas.width/2)/(canvas.width/2);
-  y = (canvas.height/2 - (y - rect.top))/(canvas.height/2);
-
-  return ([x,y])
-}
-
-var g_shapesList = [];
-
-// var g_points = [];  // The array for the position of a mouse press
-// var g_colors = [];  // The array to store the color of a point
-
-
-function click(ev) {
-  //extract click and return in WebGL coord form
-  let [x,y] = convertCoordinatesEventToGL(ev);
-
-  let point;
-  if (g_selectedType==POINT) {
-    point = new Point();
-  } else if (g_selectedType==TRIANGLE) {
-    point = new Triangle();
-  } else {
-    point = new Circle();
-    point.segments = g_segmentSize;   //chatGPT helped figure out this should go here
-  }
-  
-  point.position=[x,y];
-  point.size=5.0;
-  point.color = g_selectedColor.slice();
-  g_shapesList.push(point);
-  renderAllShapes();
-  
-}
+//Poke Animation Framework
+let g_pokeActive = false;
+let g_pokeStartTime = 0;
+const POKE_DURATION = 1000; // ms
 
 function renderAllShapes() {
   var startTime = performance.now();
 
-  var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
+  // chatgpt used to figure out full rotation and to make it work with slider
+  // Compose global rotation: first X (vertical drag), then Y (horizontal drag)
+  
+  var globalRotMat = new Matrix4();
+  globalRotMat.scale(0.7, 0.7, 0.7); // Zoom out more
+  globalRotMat.rotate(g_globalAngle + g_globalAngleY, 0, 1, 0); // Combine slider and mouse drag for yaw
+  globalRotMat.rotate(g_globalAngleX, 1, 0, 0); // Pitch (vertical drag)
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
   //clear <canvas>
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  if (g_presetModeActive) {
-    presetDrawing(); // call only if mode is active
-  }
+  
 
   // Draw the body cube
   var body = new Cube();
-  body.color = [1.0, 0.0, 0.0, 1.0];
-  body.matrix.translate(-.25, -.75, 0.0);
+  body.color = [0.55, 0.27, 0.07, 1.0]; // Brown
+  body.matrix.translate(-.25, -1, 0.0);
   body.matrix.rotate(-5, 1, 0, 0);
-  body.matrix.scale(0.5, .3, .5);
+  body.matrix.scale(1, 0.75, 0.75);
   body.render();
 
-  // Draw a left arm
-  var yellow = new Cube();
-  yellow.color = [1,1,0,1];
-  yellow.matrix.setTranslate(0,-.5,0.0);
-  yellow.matrix.rotate(-5,1,0,0);
-  yellow.matrix.rotate(-g_yellowAngle,0,0,1); 
-  // if (g_yellowAnimation) {
-  //   yellow.matrix.rotate(45*Math.sin(g_seconds),0,0,1);
-  // } else {
-  // yellow.matrix.rotate(-g_yellowAngle,0,0,1);
-  // }
-  var yellowCoordinatesMat=new Matrix4(yellow.matrix);
-  yellow.matrix.scale(0.25,.7,.5);
-  yellow.matrix.translate(-.5,0,0);
-  yellow.render();
+  // Draw a green pyramid next to the body cube
+  var headPyramid = new Pyramid();
+  headPyramid.color = [1.0, 0.87, 0.68, 1.0]; // Light peach (head)
+  headPyramid.matrix.translate(-0.25, -0.3, 0.0); 
+  headPyramid.matrix.rotate(-5,1,0,0);
+  headPyramid.matrix.scale(1, 0.6, 0.6); 
+  headPyramid.render();
 
-  // Test box
-  var magenta = new Cube();
-  magenta.color = [1,0,1,1];
-  magenta.matrix = yellowCoordinatesMat;
-  magenta.matrix.translate(0,.65,0);
-  magenta.matrix.rotate(-g_magentaAngle,0,0,1);
-  // magenta.matrix.translate(0,.65,0);
-  // magenta.matrix.rotate(-g_magentaAngle,0,0,1);
-  magenta.matrix.scale(.3,.3,.3);
-  magenta.matrix.translate(-.5,0,-.001,0);
-  magenta.render();
+  // Draw pyramid eyes
+  var eyePyramid = new Pyramid();
+  var eyePyramid2 = new Pyramid();
+  if (g_pokeActive) {
+    //angery, both eyes turn red
+    eyePyramid.color = [1,0,0,1]; // Red
+    eyePyramid2.color = [1,0,0,1]; // Red
+  } else {
+    eyePyramid.color = [0.5,0.5,0.5,1];
+    eyePyramid2.color = [0.5,0.5,0.5,1];
+  }
+  eyePyramid.matrix.set(headPyramid.matrix);
+  eyePyramid.matrix.translate(0.35, 0.5, 0.28);
+  eyePyramid.matrix.rotate(-80,1,0,0);
+  eyePyramid.matrix.scale(0.13, 0.13, 0.13);
+  eyePyramid.render();
+
+  eyePyramid2.matrix.set(headPyramid.matrix);
+  eyePyramid2.matrix.translate(0.55, 0.5, 0.28);
+  eyePyramid2.matrix.rotate(-80,1,0,0);
+  eyePyramid2.matrix.scale(0.13, 0.13, 0.13);
+  eyePyramid2.render();
+
+  // Left arm
+  var leftArm = new Cube();
+  leftArm.color = [0.96, 0.76, 0.53, 1.0]; // Tan
+  leftArm.matrix.translate(0,-.5,0.0);
+  leftArm.matrix.rotate(5,1,0,0);
+  leftArm.matrix.rotate(-g_leftArmAngle,0,0,1);   
+
+  var leftArmCoordinatesMat = new Matrix4(leftArm.matrix);
+
+  leftArm.matrix.scale(0.25, 0.7, 0.25); 
+  leftArm.matrix.translate(0, 0.35, 0);
+  leftArm.render();
+
+  // Left Hand
+  var leftHand = new Cube();
+  leftHand.color = [1.0, 0.8, 0.86, 1.0]; // Pink
+  leftHand.matrix = leftArmCoordinatesMat;
+  leftHand.matrix.translate(0.06, 0.9, 0.05);
+  leftHand.matrix.rotate(-g_leftHandAngle,0,0,1);
+  leftHand.matrix.scale(.2,.2,.2);
+
+  leftHand.render();
+
+  // Walking stick (attached to left hand)
+  var walkingStick = new Cube();
+  walkingStick.color = [1, 1, 1, 1]; // White
+  walkingStick.matrix = new Matrix4(leftHand.matrix); 
+  walkingStick.matrix.translate(0.05, 0.7, 0.05); 
+  walkingStick.matrix.rotate(90, 0, 0, 1); 
+  walkingStick.matrix.rotate(-g_walkingStickAngle, 1, 0, 0); 
+  walkingStick.matrix.scale(0.1, 4.0, 0.1);
+  walkingStick.render();
+
+  // Right arm
+  var rightArm = new Cube();
+  rightArm.color = [0.4, 0.6, 0.85, 1.0]; // Light blue
+  rightArm.matrix.translate(0.3,-0.5,0.0); 
+  rightArm.matrix.rotate(-5,1,0,0); 
+  rightArm.matrix.rotate(g_rightArmAngle,0,0,1); 
+
+  var rightArmCoordinatesMat = new Matrix4(rightArm.matrix);
+
+  rightArm.matrix.scale(0.25, 0.7, 0.25); 
+  rightArm.matrix.translate(0.125, 0.35, 0); 
+  rightArm.render();
+
+  // Right Hand
+  var rightHand = new Cube();
+  rightHand.color = [1.0, 0.8, 0.86, 1.0]; // Pink (same as left hand)
+  rightHand.matrix = rightArmCoordinatesMat; 
+
+  rightHand.matrix.translate(0.16, 0.9, 0.05); 
+  rightHand.matrix.rotate(-g_rightHandAngle,0,0,1); 
+  rightHand.matrix.scale(.2,.2,.2);
+
+  rightHand.render();
 
   //debug time
   var duration = performance.now() - startTime;
@@ -292,63 +403,4 @@ function sendTextToHTML(text, htmlID) {
     return;
   }
   htmlElm.innerHTML = text;
-}
-
-
-//make visible if circle; chatGPT used to figure out how to toggle visibility
-function updateSegmentSliderVisibility() {
-    const segmentsContainer = document.getElementById('segmentsControlContainer');
-    if (g_selectedType === CIRCLE) {
-        segmentsContainer.style.display = 'block';
-    } else {
-        segmentsContainer.style.display = 'none';
-    }
-}
-
-
-//-- Function created by using the formula from http://en.wikipedia.org/wiki/HSL_color_space and chatGPT assistance
-function hslToRgb(h, s, l) {
-  let r, g, b;
-
-  if (s == 0) {
-    r = g = b = l; //gray
-  } else {
-    const hue2rgb = (p, q, t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 1 / 2) return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-      return p;
-    };
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1 / 3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1 / 3);
-  }
-  return [r, g, b];
-}
-
-
-function presetDrawing() {
-  drawTriangle([0.0, 0.63, -0.48, -0.33, 0.48, -0.33]);//body
-  drawTriangle([-0.25, -0.28, -0.57, -0.92, 0.07, -0.92]);//left foot
-  drawTriangle([0.25, -0.28, -0.07, -0.92, 0.57, -0.92]);//right foot
-
-  //chatGPT used to figure out spacing logic for remaining tiny triangles
-   const tinySize = 0.04; // Base width/height for tiny triangles
-    let currentX = -0.4;   // Starting X position for the line of triangles
-    const startY = 0.7;    // Y position for the line of triangles
-    const spacing = 0.05;  // Spacing between triangle centers
-
-    // Calls 4 through 20
-    for (let i = 0; i < 17; i++) {
-        drawTriangle([
-            currentX, startY + tinySize,                 // Top point
-            currentX - tinySize / 2, startY,             // Bottom left
-            currentX + tinySize / 2, startY              // Bottom right
-        ]);
-        currentX += spacing;
-    }
 }

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Change a point color</title>
+    <title>Blocky Animal</title>
   </head>
 
   <body onload="main()">
@@ -13,48 +13,40 @@
     <p></p>
     <p id="numdot"> XXX </p>
       <!-- Kazuya Hashimoto, klhashim@ucsc.edu-->
-    
-    
-    
-    
-
-    <button type="button" id="clear">Clear</button>
-
-    <p>
-    <button type="button" id="pointButton">Point</button>
-    <button type="button" id="triButton">Triangle</button>
-    <button type="button" id="circleButton">Circle</button> 
-    <button type="button" id="presetButton">Preset</button>
-    <p>
-     
-    
-    <p>
-    
     <p>
     
     <p>
 
-    Yellow <input type="range" min="-90" max="90" value = "0" class = "slider" id="yellowSlide">
-<br>Animation:
-<button type="button" id="animationYellowOnButton">ON</button>
-<button type="button" id="animationYellowOffButton">OFF</button>
-<p>
-Magenta <input type="range" min="-90" max="90" value = "0" class = "slider" id="magentaSlide">
-<br>Animation:
-<button type="button" id="animationMagentaOnButton">ON</button>
-<button type="button" id="animationMagentaOffButton">OFF</button>
-<p>
-    
-    Camera Angle <input type="range" min="0" max="90" value = "5" class = "slider" id="angleSlide">
+    Left Arm <input type="range" min="-90" max="0" value = "-70" class = "slider" id="leftArmSlide">
+    <br>Animation:
+    <button type="button" id="animationLeftArmOnButton">ON</button>
+    <button type="button" id="animationLeftArmOffButton">OFF</button>
+    <p>
+    Left Hand <input type="range" min="-120" max="30" value = "0" class = "slider" id="leftHandSlide">
+    <br>Animation:
+    <button type="button" id="animationLeftHandOnButton">ON</button>
+    <button type="button" id="animationLeftHandOffButton">OFF</button>
+    <p>
+    Walking Stick <input type="range" min="-45" max="45" value="0" class="slider" id="walkingStickSlide">
+    <br>Animation:
+    <button type="button" id="animationWalkingStickOnButton">ON</button>
+    <button type="button" id="animationWalkingStickOffButton">OFF</button>
+    <p>
+    Right Arm <input type="range" min="-90" max="0" value="-70" class="slider" id="rightArmSlide">
+    <br>Animation:
+    <button type="button" id="animationRightArmOnButton">ON</button>
+    <button type="button" id="animationRightArmOffButton">OFF</button>
+    <p>
+    Right Hand <input type="range" min="-120" max="30" value="-20" class="slider" id="rightHandSlide">
+    <br>Animation:
+    <button type="button" id="animationRightHandOnButton">ON</button>
+    <button type="button" id="animationRightHandOffButton">OFF</button>
+    <p>
+
+    Camera Angle <input type="range" min="0" max="30" value = "5" class = "slider" id="angleSlide">
     <p>
     
-    <div id="segmentsControlContainer" style="display: none;"> <!-- Start hidden, chatGPT used to figure out how to start hidden-->
-    <label for="segSlide">Segments:</label>
-    <input type="range" id="segSlide" min="3" max="100" value="10">
-    </div>
-
-  
-   
+ 
 
     <script src="../lib/webgl-utils.js"></script>
     <script src="../lib/webgl-debug.js"></script>
@@ -64,6 +56,7 @@ Magenta <input type="range" min="-90" max="90" value = "0" class = "slider" id="
     <script src="Triangle.js"></script>
     <script src="Point.js"></script>
     <script src="Cube.js"></script>
+    <script src="Pyramid.js"></script>
     <script src="BlockyAnimal.js"></script>
   </body>
 </html>
