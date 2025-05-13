@@ -60,6 +60,11 @@ let u_Sampler0;
 let u_Sampler1;
 let u_Sampler2;
 
+// Global variables for mouse drag camera rotation
+let g_isDragging = false;
+let g_lastMouseX = -1;
+const MOUSE_SENSITIVITY_X = 0.2; //senstivity of mouse rotation
+
 //global variables for optimization (suggested by chatgpt)
 let g_projMat = new Matrix4();
 let g_viewMat = new Matrix4();
@@ -196,6 +201,38 @@ function addActionsForHtmlUI(){
 
   //document.getElementById('angleSlide').addEventListener('mousemove', function() {g_globalAngle = this.value; renderAllShapes();});
 
+  // Register mouse event handlers for camera rotation
+  canvas.onmousedown = handleMouseDown;
+  document.onmousemove = handleMouseMove; // Use document to catch moves outside canvas
+  document.onmouseup = handleMouseUp;   // Use document to catch mouse up outside canvas
+}
+
+function handleMouseDown(ev) {
+  if (ev.button === 0) { // Check for left mouse button
+    g_isDragging = true;
+    g_lastMouseX = ev.clientX;
+  }
+}
+
+function handleMouseMove(ev) {
+  if (!g_isDragging) {
+    return;
+  }
+
+  let deltaX = ev.clientX - g_lastMouseX;
+
+  if (deltaX !== 0) {
+    g_camera.panRight(deltaX * MOUSE_SENSITIVITY_X);
+  }
+
+  g_lastMouseX = ev.clientX;
+  renderAllShapes(); // Re-render the scene after camera pan
+}
+
+function handleMouseUp(ev) {
+  if (ev.button === 0) { // Check for left mouse button
+    g_isDragging = false;
+  }
 }
 
 function initTextures() {
