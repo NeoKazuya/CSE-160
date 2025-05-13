@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blocky World Maze</title>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="600" height="600">
+    Please use a browser that supports "canvas"
+    </canvas>
+    <p id="numdot"> XXX </p>
+    <!-- Victory Pop-up (asked gpt to help stylize this)-->
+    <div id="victoryPopup" style="display: none; position: absolute; top: 40%; left: 40%; background-color: white; padding: 20px; border: 2px solid black; text-align: center; font-size: 24px; font-weight: bold;">
+        Victory!
+    </div>
+
+    <div id="controls_text" style="text-align: center; margin-top: 10px;">
+      Find and break the gold block in the maze! (or look behind you)<br>
+      Move with WASD, turn with Q and E, B to break.
+    </div>
+
+    <div id="texture_links" style="text-align: center; margin-top: 10px;">
+      Texture Sources (downscaled from these sources):<br>
+      Wall Block: <a href="#" id="command_block_link">https://opengameart.org/content/64x-textures-an-overlays</a><br>
+      Maze Block: <a href="#" id="maze_block_link">https://opengameart.org/content/all-textures-for-the-labyrinth-of-the-fertile-void</a><br>
+      Diamond Block: <a href="#" id="diamond_block_link">https://minecraft.novaskin.me/post/1621313055/diamond-block-128x128</a><br>
+    </div>
+
+    <br>
+    <p></p>
+    
+      <!-- Kazuya Hashimoto, klhashim@ucsc.edu-->
+    <p>
+    
+    <p>
+    <!-- Camera Angle -->
+    <!--Camera Angle <input type="range" min="0" max="30" value = "5" class = "slider" id="angleSlide">-->
+    <p>
+    
+ 
+
+    <script src="../lib/webgl-utils.js"></script>
+    <script src="../lib/webgl-debug.js"></script>
+    <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+    <script src="Camera.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Cube.js"></script>
+    <script src="BlockyWorld.js"></script>
+
+    <div style="margin-top: 20px;">
+      <p>Estimated Maze Guide (Central 10x10):</p>
+      <pre id="mazeAsciiGuide" style="line-height: 1.0;">
+.  .  .  .  .  .  .  .  .  .
+
+.           .        .     .
+
+.     .     .     .       .
+
+.     .                 .  .
+
+.     .  .  .  .     .  .  .
+
+.              .           .
+
+.     .  .     .  .  .     .
+
+.     .  .           .  G  .
+
+.           .        .     .
+
+.  .  .  .  .        .  .  .
+      </pre>
+      <p>(G = Gold Block, . = Wall)</p>
+    </div>
+
+  </body>
+</html>
