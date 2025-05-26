@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blocky World Maze</title>
+  </head>
+
+  <body onload="main()">
+    <canvas id="webgl" width="600" height="600">
+    Please use a browser that supports "canvas"
+    </canvas>
+
+    <p id="numdot"> XXX </p>
+    <p>
+      <button id="normalOn">Normal On</button>
+      <button id="normalOff">Normal Off</button>
+      <button id="animationToggle">Animation On/Off</button>
+      <br>
+      Light: 
+      <button id="lightOn">On</button>
+      <button id="lightOff">Off</button>
+      <br>
+      Spot Light: 
+      <button id="spotLightOn">On</button>
+      <button id="spotLightOff">Off</button>
+    <!-- Victory Pop-up (asked gpt to help stylize this)-->
+    <div id="victoryPopup" style="display: none; position: absolute; top: 40%; left: 40%; background-color: white; padding: 20px; border: 2px solid black; text-align: center; font-size: 24px; font-weight: bold;">
+        Victory!
+    </div>
+
+    <p>
+      Light X <input type="range" min="-500" max="600" value="450" class="slider" id="lightSlideX">
+      Light Y <input type="range" min="-250" max="250" value="100" class="slider" id="lightSlideY">
+      Light Z <input type="range" min="-100" max="400" value="225" class="slider" id="lightSlideZ">
+    <p>
+    <div id="controls_text" style="text-align: center; margin-top: 10px;">
+      Find and break the gold block in the maze! (or look to your right)<br>
+      Move with WASD, turn with Q and E, B to break. Camera can also be moved with left click and drag.<br>
+      <br>
+      Sphere and spotlight are to the left.
+    </div>
+
+    <div id="texture_links" style="text-align: center; margin-top: 10px;">
+      Texture Sources (downscaled from these sources):<br>
+      Maze Block: <a href="#" id="maze_block_link">https://opengameart.org/content/all-textures-for-the-labyrinth-of-the-fertile-void</a><br>
+      Wall Block, Sphere: <a href="#" id="sphere_link">https://opengameart.org/content/64x-textures-an-overlays</a><br>
+    </div>
+
+    <br>
+    <p></p>
+    
+      <!-- Kazuya Hashimoto, klhashim@ucsc.edu-->
+    <p>
+    
+    <p>
+    <!-- Camera Angle -->
+    <!--Camera Angle <input type="range" min="0" max="30" value = "5" class = "slider" id="angleSlide">-->
+    <p>
+    
+ 
+
+    <script src="../lib/webgl-utils.js"></script>
+    <script src="../lib/webgl-debug.js"></script>
+    <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+    <script src="Camera.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Cube.js"></script>
+    <script src="Sphere.js"></script>
+    <script src="BlockyWorld.js"></script>
+
+    <div style="margin-top: 20px;">
+      <p>Estimated Maze Guide (Central 10x10) (many walls removed for lighting project):</p>
+      <pre id="mazeAsciiGuide" style="line-height: 1.0;">
+
+
+
+      .     .     .       .
+
+      .                 .  
+
+      .  .  .  .     .  .  
+
+               .           
+
+      .  .     .  .  .     
+
+      .  .           .  G  
+
+            .        .     
+
+      .  .           .  .  
+      </pre>
+      <p>(G = Gold Block, . = Wall)</p>
+    </div>
+
+  </body>
+</html>
