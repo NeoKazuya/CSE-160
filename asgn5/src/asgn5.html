@@ -1,0 +1,516 @@
+<script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.177.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.177.0/examples/jsm/"
+      }
+    }
+    </script>
+<canvas id="c"></canvas>
+<!-- chatgpt helped with figuring out canvas size + adding game info text cleanly-->
+<div id="gameInfoText">
+  <h1>3D Maze Game</h1>
+  <p>Use WASD or Arrow Keys to move. Click and drag to look around.</p>
+  <p>Find the fish and the icicle!</p>
+
+  <p>Attributions:</p>
+  <p>Wall/Icicle/Skybox texture: <a href="https://opengameart.org/content/64x-textures-an-overlays">https://opengameart.org/content/64x-textures-an-overlays</a></p>
+  <p>Fish by jeremy [<a href="https://creativecommons.org/licenses/by/3.0/">CC-BY</a>] via Poly Pizza (<a href="https://poly.pizza/m/52s3JpUSjmX">https://poly.pizza/m/52s3JpUSjmX</a>)</p>
+  <p>--------------------------------</p>
+  <p>Notes to grader:</p>
+  <p>Primary shapes implemented are Cube, Sphere, and Pyramid. Lights added were Hemisphere for the overall scene, then Ambient, Point, and Spot for the maze.</p>
+  <p>Point is above the maze, and Spot is on top of the fish. Helper visualizations are commented out but in the code.</p>
+  <p>Maze and outside wall collision detection have been added and instances of chatgpt use are noted in the code.</p>
+
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+
+function main() {
+  const canvas = document.querySelector('#c');
+  const renderer = new THREE.WebGLRenderer({antialias: true, canvas});
+
+  const fov = 75;
+  const aspect = 2;
+  const near = 0.1;
+  const far = 100;
+  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+
+  const scene = new THREE.Scene();
+
+
+  //Cubemap Skybox
+  {
+    const loader = new THREE.CubeTextureLoader();
+    // kind of like a minecraft grass block idk
+    const texture = loader.load([
+      'dirt.png',
+      'dirt.png',
+      'grass.png', //top
+      'dirt.png',
+      'dirt.png',
+      'dirt.png',
+    ]);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    scene.background = texture;
+  }
+
+  // HemisphereLight for scene there's some overall light but not too much
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+  hemiLight.position.set(0, 25, 0);
+  scene.add(hemiLight);
+
+  // Maze Lights
+  // AmbientLight
+  const ambientColor = 0x404040; // ambient subtle white light color
+  const ambientIntensity = 0.5;
+  const ambientLight = new THREE.AmbientLight(ambientColor, ambientIntensity);
+  scene.add(ambientLight); 
+
+  // PointLight
+  const pointLightColor = 0xFF8844; // Warmish color
+  const pointLightIntensity = 100;
+  const pointLightDistance = 20;
+  const pointLight = new THREE.PointLight(pointLightColor, pointLightIntensity, pointLightDistance);
+  scene.add(pointLight);
+
+  //PointLightHelper visualization
+  //const pointLightHelper = new THREE.PointLightHelper(pointLight);
+  //scene.add(pointLightHelper);
+
+  // SpotLight (chatgpt helped with figuring out the various properties)
+  const spotLightColor = 0xFFFFFF; // White light
+  const spotLightIntensity = 150;
+  const spotLight = new THREE.SpotLight(spotLightColor, spotLightIntensity);
+  spotLight.position.set(5, 10, 5); // Spotlight position
+  spotLight.target.position.set(0, 0, 0);
+  spotLight.angle = Math.PI / 6; // 30 degrees
+  spotLight.penumbra = 0.25; // Softness of the cone edge
+  spotLight.distance = 30;
+
+  scene.add(spotLight);
+  scene.add(spotLight.target);
+
+  //SpotLightHelper visualization
+  //const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+  //scene.add(spotLightHelper);
+
+  // Ground Plane
+  const planeSize = 40;
+  const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
+  const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, side: THREE.DoubleSide }); //dirt color
+  const groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+  groundPlane.rotation.x = Math.PI * -0.5; // horizontal
+  groundPlane.position.y = -0.5; 
+  scene.add(groundPlane);
+
+  // Boundary Spheres around the Plane
+  const sphereBoundaryRadius = 1.0;
+  const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 }); //grey spheres (maybe change)
+  const numSpheresPerSide = 20; // spheres per side
+  const step = planeSize / numSpheresPerSide;
+
+  // Collision detection arrays (chatgpt helped with this)
+  const wallMeshes = []; // Array to store wall meshes for collision detection
+  const sphereBoundaryMeshes = []; // Array to store sphere boundary meshes for collision detection
+  const cornerSpheres = []; 
+  const playerCollider = new THREE.Box3(); // Player's bounding box
+  const playerHeight = 1.7;
+  const playerSize = new THREE.Vector3(1, playerHeight, 1); // Width, Height, Depth of player
+
+  for (let i = 0; i <= numSpheresPerSide; i++) {
+    const xPos = -planeSize / 2 + i * step;
+    const zPos = -planeSize / 2 + i * step;
+
+    // Top edge
+    const sphereTop = new THREE.Mesh(
+      new THREE.SphereGeometry(sphereBoundaryRadius, 16, 16),
+      sphereMaterial
+    );
+    sphereTop.position.set(xPos, groundPlane.position.y + sphereBoundaryRadius, -planeSize / 2);
+    scene.add(sphereTop);
+    sphereBoundaryMeshes.push(sphereTop); // Add to collision array
+    if (i === 0 || i === numSpheresPerSide) { // Check for corner
+      cornerSpheres.push(sphereTop);
+    }
+
+    // Bottom edge
+    const sphereBottom = new THREE.Mesh(
+      new THREE.SphereGeometry(sphereBoundaryRadius, 16, 16),
+      sphereMaterial
+    );
+    sphereBottom.position.set(xPos, groundPlane.position.y + sphereBoundaryRadius, planeSize / 2);
+    scene.add(sphereBottom);
+    sphereBoundaryMeshes.push(sphereBottom); // Add to collision array
+    if (i === 0 || i === numSpheresPerSide) { // Check for corner
+      cornerSpheres.push(sphereBottom);
+    }
+
+    //avoid duplicating corners
+    if (i > 0 && i < numSpheresPerSide) {
+      const sphereLeft = new THREE.Mesh(
+        new THREE.SphereGeometry(sphereBoundaryRadius, 16, 16),
+        sphereMaterial
+      );
+      sphereLeft.position.set(-planeSize / 2, groundPlane.position.y + sphereBoundaryRadius, zPos);
+      scene.add(sphereLeft);
+      sphereBoundaryMeshes.push(sphereLeft); // Add to collision array
+
+      //avoid duplicating corners
+      const sphereRight = new THREE.Mesh(
+        new THREE.SphereGeometry(sphereBoundaryRadius, 16, 16),
+        sphereMaterial
+      );
+      sphereRight.position.set(planeSize / 2, groundPlane.position.y + sphereBoundaryRadius, zPos);
+      scene.add(sphereRight);
+      sphereBoundaryMeshes.push(sphereRight); // Add to collision array
+    }
+  }
+
+  // corner sphere colors for fun (this used to be for animating only the corners but I changed it)
+  const cornerSphereColors = [
+    0xff0000, // Red
+    0x00ff00, // Green
+    0x0000ff, // Blue
+    0xffff00  // Yellow
+  ];
+
+  cornerSpheres.forEach((sphere, index) => {
+    sphere.material = new THREE.MeshStandardMaterial({ color: cornerSphereColors[index] });
+  });
+
+
+  // Maze Generation
+  const maze = [
+    [1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 1, 0, 1],
+    [1, 1, 0, 0, 1, 0, 1],
+    [1, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 1],
+    [1, 1, 0, 0, 1, 1, 1],
+  ];
+  const wallSize = 2; // Size of each wall cube
+  const wallHeight = 4; // 2 blocks high (2 * wallSize)
+
+  const textureLoader = new THREE.TextureLoader();
+  const bricksTexture = textureLoader.load('bricks.png');
+  bricksTexture.colorSpace = THREE.SRGBColorSpace;
+  bricksTexture.wrapS = THREE.RepeatWrapping;
+  bricksTexture.wrapT = THREE.RepeatWrapping;
+
+  bricksTexture.repeat.set(1, wallHeight / wallSize); 
+
+  const wallMaterial = new THREE.MeshStandardMaterial({ map: bricksTexture });
+
+  for (let i = 0; i < maze.length; i++) {
+    for (let j = 0; j < maze[i].length; j++) {
+      if (maze[i][j] === 1) {
+        const wallGeometry = new THREE.BoxGeometry(wallSize, wallHeight, wallSize);
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+        
+        // Center the maze on the plane (chatgpt helped with this)
+        wall.position.set(
+          (j - maze[i].length / 2 + 0.5) * wallSize,
+          groundPlane.position.y + wallHeight / 2,
+          (i - maze.length / 2 + 0.5) * wallSize
+        );
+        scene.add(wall);
+        wallMeshes.push(wall); // Store wall for collision detection
+      }
+    }
+  }
+
+  // Start position (entrance)
+  const startRow = 5;
+  const startCol = 3;
+
+  camera.position.set(
+    (startCol - maze[0].length / 2 + 0.5) * wallSize,
+    groundPlane.position.y + playerHeight,
+    15
+  );
+  camera.lookAt( // Look towards the maze
+    (startCol - maze[0].length / 2 + 0.5) * wallSize,
+    groundPlane.position.y + playerHeight,
+    (startRow - maze.length / 2 + 0.5) * wallSize
+  );
+
+  // Used chatgpt to figure out how to replace FirstPersonControls with click-and-drag look, as FirstPersonControls was making me dizzy (due to drone type movement)
+  camera.rotation.order = 'YXZ';
+
+  const clock = new THREE.Clock();
+
+  // Mouse look states
+  let isDragging = false;
+  let previousMouseX = 0;
+  let previousMouseY = 0;
+  const lookSensitivity = 0.002;
+
+  // Keyboard movement states
+  let moveForward = false;
+  let moveBackward = false;
+  let moveLeft = false;
+  let moveRight = false;
+  const movementSpeed = 10.0;
+
+
+  // Used chatgpt to help with simplified code for both WASD and arrow keys
+  const onKeyDown = (event) => {
+    switch (event.code) {
+      case 'ArrowUp':
+      case 'KeyW':
+        moveForward = true;
+        break;
+      case 'ArrowLeft':
+      case 'KeyA':
+        moveLeft = true;
+        break;
+      case 'ArrowDown':
+      case 'KeyS':
+        moveBackward = true;
+        break;
+      case 'ArrowRight':
+      case 'KeyD':
+        moveRight = true;
+        break;
+    }
+  };
+
+  const onKeyUp = (event) => {
+    switch (event.code) {
+      case 'ArrowUp':
+      case 'KeyW':
+        moveForward = false;
+        break;
+      case 'ArrowLeft':
+      case 'KeyA':
+        moveLeft = false;
+        break;
+      case 'ArrowDown':
+      case 'KeyS':
+        moveBackward = false;
+        break;
+      case 'ArrowRight':
+      case 'KeyD':
+        moveRight = false;
+        break;
+    }
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  // Mouse event listeners for click-and-drag look (according to chatgpt)
+  canvas.addEventListener('mousedown', (event) => {
+    isDragging = true;
+    previousMouseX = event.clientX;
+    previousMouseY = event.clientY;
+  });
+
+  document.addEventListener('mousemove', (event) => {
+    if (isDragging) {
+      const deltaX = event.clientX - previousMouseX;
+      const deltaY = event.clientY - previousMouseY;
+
+      camera.rotation.y -= deltaX * lookSensitivity;
+      camera.rotation.x -= deltaY * lookSensitivity;
+
+      // Clamp pitch to prevent flipping over
+      camera.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, camera.rotation.x));
+
+      previousMouseX = event.clientX;
+      previousMouseY = event.clientY;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // Fish
+  {
+    const mtlLoader = new MTLLoader();
+    mtlLoader.load('Goldfish_01.mtl', (mtl) => {
+      mtl.preload();
+      const objLoader = new OBJLoader();
+      objLoader.setMaterials(mtl);
+      objLoader.load('Goldfish_01.obj', (root) => {
+        scene.add(root);
+
+        // Scale
+        const desiredSize = 2;
+        const box = new THREE.Box3().setFromObject(root);
+        const boxSize = box.getSize(new THREE.Vector3()).length();
+        const scale = desiredSize / boxSize;
+        root.scale.set(scale, scale, scale);
+
+        const postScaleBox = new THREE.Box3().setFromObject(root);
+        const postScaleBoxSize = postScaleBox.getSize(new THREE.Vector3());
+
+        // Put the fish in the back right corner of the maze
+        const fishX = 4;
+        const fishZ = -4;
+
+        root.position.set(fishX, groundPlane.position.y + postScaleBoxSize.y / 2, fishZ);
+
+        // Point light/slightly above the fish
+        pointLight.position.x = root.position.x;
+        pointLight.position.y = root.position.y + (postScaleBoxSize.y / 2) + 0.5;
+        pointLight.position.z = root.position.z;
+
+      });
+    });
+  }
+
+  // Add a Pyramid in a maze corner
+  const pyramidRadiusBottom = wallSize * 0.4;
+  const pyramidHeight = wallHeight * 0.75;
+  const pyramidRadialSegments = 4;
+  const pyramidGeometry = new THREE.CylinderGeometry(
+    0,
+    pyramidRadiusBottom,
+    pyramidHeight,
+    pyramidRadialSegments
+  );
+
+  // Texture for the pyramid
+  const pyramidTextureLoader = new THREE.TextureLoader();
+  const pyramidTexture = pyramidTextureLoader.load('ice.png');
+  pyramidTexture.colorSpace = THREE.SRGBColorSpace;
+  pyramidTexture.wrapS = THREE.RepeatWrapping;
+  pyramidTexture.wrapT = THREE.RepeatWrapping;
+
+  const pyramidMaterial = new THREE.MeshStandardMaterial({
+    map: pyramidTexture
+  });
+  const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
+
+  // Back left corner of maze
+  const pyramidX = -4;
+  const pyramidY = 1;
+  const pyramidZ = -4;
+  pyramid.position.set(pyramidX, pyramidY, pyramidZ);
+  scene.add(pyramid);
+
+
+  function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+    }
+    return needResize;
+  }
+
+
+  // Render function, chatgpt helped with collision detection
+  function render(time) {
+    time *= 0.001;
+
+    const deltaTime = clock.getDelta();
+    const actualMoveSpeed = movementSpeed * deltaTime;
+
+    // Store position before potential movement for collision detection
+    const prevX = camera.position.x;
+    const prevZ = camera.position.z;
+
+    if (resizeRendererToDisplaySize(renderer)) {
+      const canvas = renderer.domElement;
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    }
+
+    // Keyboard movement logic
+    if (moveForward) {
+      camera.translateZ(-actualMoveSpeed);
+    }
+    if (moveBackward) {
+      camera.translateZ(actualMoveSpeed);
+    }
+    if (moveLeft) {
+      camera.translateX(-actualMoveSpeed);
+    }
+    if (moveRight) {
+      camera.translateX(actualMoveSpeed);
+    }
+
+
+    //chatgpt helped with collision detection code from here
+    // Update player collider based on new camera position
+    playerCollider.setFromCenterAndSize(camera.position, playerSize);
+
+    // Collision detection with maze walls
+    for (const wall of wallMeshes) {
+      const wallCollider = new THREE.Box3().setFromObject(wall);
+      if (playerCollider.intersectsBox(wallCollider)) {
+        // Collision detected, revert position
+        camera.position.x = prevX;
+        camera.position.z = prevZ;
+        // Update playerCollider again to reflect reverted position
+        playerCollider.setFromCenterAndSize(camera.position, playerSize); 
+        break; // Stop checking after first collision
+      }
+    }
+
+    // Collision detection with boundary spheres
+    for (const sphere of sphereBoundaryMeshes) {
+      const sphereCollider = new THREE.Box3().setFromObject(sphere);
+      if (playerCollider.intersectsBox(sphereCollider)) {
+        // Collision detected, revert position
+        camera.position.x = prevX;
+        camera.position.z = prevZ;
+        // Update playerCollider again to reflect reverted position
+        playerCollider.setFromCenterAndSize(camera.position, playerSize); 
+        break; // Stop checking after first collision
+      }
+    }
+
+    // Make sure player cant fly
+    camera.position.y = groundPlane.position.y + playerHeight;
+
+    // Animation for boundary spheres
+    if (sphereBoundaryMeshes.length > 0) {
+      const bobbingSpeed = 1.5;
+      const bobbingAmplitude = 0.5;
+      const newBaseY = groundPlane.position.y + sphereBoundaryRadius + bobbingAmplitude;
+
+      sphereBoundaryMeshes.forEach((sphere) => {
+        sphere.position.y = newBaseY + Math.sin(time * bobbingSpeed) * bobbingAmplitude;
+      });
+    }
+
+    renderer.render(scene, camera);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+main();
+</script>
+<style>
+html, body {
+ margin: 0;
+ padding: 10px;
+ background-color: #f0f0f0;
+}
+#c {
+ width: 800px;
+ height: 600px;
+ display: block;
+ margin: 20px auto;
+ box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+#gameInfoText {
+  text-align: center;
+  margin-bottom: 20px;
+  font-family: sans-serif;
+}
+</style>
